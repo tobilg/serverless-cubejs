@@ -1,0 +1,294 @@
+# See:
+# * https://www.infoq.com/articles/aws-vpc-cloudformation/
+# * https://www.infoq.com/articles/aws-vpc-cloudformation-part2/
+# * https://templates.cloudonaut.io/en/stable/vpc/
+
+Resources:
+
+  VPC:
+    Type: AWS::EC2::VPC
+    Properties:
+      CidrBlock: 10.0.0.0/20
+      EnableDnsSupport: True
+      EnableDnsHostnames: True
+      InstanceTenancy: default
+  
+  InternetGateway:
+    Type: AWS::EC2::InternetGateway
+  
+  GatewayAttachment:
+    Type: AWS::EC2::VPCGatewayAttachment
+    Properties:
+        VpcId: '#{VPC}'
+        InternetGatewayId: '#{InternetGateway}'
+
+  PrivateASubnet:
+    Type: AWS::EC2::Subnet
+    Properties: 
+      AvailabilityZone:
+        'Fn::Select':  [0, 'Fn::GetAZs': '']
+      CidrBlock: 10.0.0.0/23
+      VpcId: '#{VPC}'
+      Tags:
+        - Key: Name
+          Value: 'Private Subnet A'
+        - Key: Reach
+          Value: private
+
+  PrivateBSubnet:
+    Type: AWS::EC2::Subnet
+    Properties: 
+      AvailabilityZone:
+        'Fn::Select':  [1, 'Fn::GetAZs': '']
+      CidrBlock: 10.0.2.0/23
+      VpcId: '#{VPC}'
+      Tags:
+        - Key: Name
+          Value: 'Private Subnet B'
+        - Key: Reach
+          Value: private
+
+  PublicASubnet:
+    Type: AWS::EC2::Subnet
+    Properties: 
+      AvailabilityZone:
+        'Fn::Select':  [0, 'Fn::GetAZs': '']
+      CidrBlock: 10.0.8.0/23
+      VpcId: '#{VPC}'
+      Tags:
+        - Key: Name
+          Value: 'Public Subnet A'
+        - Key: Reach
+          Value: public
+
+  PublicBSubnet:
+    Type: AWS::EC2::Subnet
+    Properties: 
+      AvailabilityZone:
+        'Fn::Select':  [1, 'Fn::GetAZs': '']
+      CidrBlock: 10.0.10.0/23
+      VpcId: '#{VPC}'
+      Tags:
+        - Key: Name
+          Value: 'Public Subnet B'
+        - Key: Reach
+          Value: public
+
+  PublicARouteTable:
+    Type: AWS::EC2::RouteTable
+    Properties: 
+      VpcId: '#{VPC}'
+      Tags:
+        - Key: Name
+          Value: 'Public A'
+
+  PublicBRouteTable:
+    Type: AWS::EC2::RouteTable
+    Properties: 
+      VpcId: '#{VPC}'
+      Tags:
+        - Key: Name
+          Value: 'Public B'
+
+  PrivateARouteTable:
+    Type: AWS::EC2::RouteTable
+    Properties: 
+      VpcId: '#{VPC}'
+      Tags:
+        - Key: Name
+          Value: 'Private A'
+
+  PrivateBRouteTable:
+    Type: AWS::EC2::RouteTable
+    Properties: 
+      VpcId: '#{VPC}'
+      Tags:
+        - Key: Name
+          Value: 'Private B'
+
+  PrivateASubnetRouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties: 
+      RouteTableId: '#{PrivateARouteTable}'
+      SubnetId: '#{PrivateASubnet}'
+
+  PrivateBSubnetRouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties: 
+      RouteTableId: '#{PrivateBRouteTable}'
+      SubnetId: '#{PrivateBSubnet}'
+      
+  PublicASubnetRouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties: 
+      RouteTableId: '#{PublicARouteTable}'
+      SubnetId: '#{PublicASubnet}'
+
+  PublicBSubnetRouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties: 
+      RouteTableId: '#{PublicBRouteTable}'
+      SubnetId: '#{PublicBSubnet}'
+
+  PublicAInternetRoute:
+    Type: AWS::EC2::Route
+    DependsOn: 
+      - GatewayAttachment
+    Properties: 
+      DestinationCidrBlock: 0.0.0.0/0
+      GatewayId: '#{InternetGateway}'
+      RouteTableId: '#{PublicARouteTable}'
+
+  PublicBInternetRoute:
+    Type: AWS::EC2::Route
+    DependsOn: 
+      - GatewayAttachment
+    Properties: 
+      DestinationCidrBlock: 0.0.0.0/0
+      GatewayId: '#{InternetGateway}'
+      RouteTableId: '#{PublicBRouteTable}'
+
+  NetworkAclPublic:
+    Type: 'AWS::EC2::NetworkAcl'
+    Properties:
+      VpcId: '#{VPC}'
+      Tags:
+      - Key: Name
+        Value: Public
+
+  NetworkAclPrivate:
+    Type: 'AWS::EC2::NetworkAcl'
+    Properties:
+      VpcId: '#{VPC}'
+      Tags:
+      - Key: Name
+        Value: Private
+
+  PrivateASubnetNetworkAclAssociation:
+    Type: AWS::EC2::SubnetNetworkAclAssociation
+    Properties: 
+      NetworkAclId: '#{NetworkAclPrivate}'
+      SubnetId: '#{PrivateASubnet}'
+
+  PrivateBSubnetNetworkAclAssociation:
+    Type: AWS::EC2::SubnetNetworkAclAssociation
+    Properties: 
+      NetworkAclId: '#{NetworkAclPrivate}'
+      SubnetId: '#{PrivateBSubnet}'
+
+  PublicASubnetNetworkAclAssociation:
+    Type: AWS::EC2::SubnetNetworkAclAssociation
+    Properties: 
+      NetworkAclId: '#{NetworkAclPublic}'
+      SubnetId: '#{PublicASubnet}'
+
+  PublicBSubnetNetworkAclAssociation:
+    Type: AWS::EC2::SubnetNetworkAclAssociation
+    Properties: 
+      NetworkAclId: '#{NetworkAclPublic}'
+      SubnetId: '#{PublicBSubnet}'
+
+  NetworkAclEntryInPublicAllowAll:
+    Type: 'AWS::EC2::NetworkAclEntry'
+    Properties:
+      NetworkAclId: !Ref NetworkAclPublic
+      RuleNumber: 99
+      Protocol: -1
+      RuleAction: allow
+      Egress: false
+      CidrBlock: '0.0.0.0/0'
+
+  NetworkAclEntryOutPublicAllowAll:
+    Type: 'AWS::EC2::NetworkAclEntry'
+    Properties:
+      NetworkAclId: !Ref NetworkAclPublic
+      RuleNumber: 99
+      Protocol: -1
+      RuleAction: allow
+      Egress: true
+      CidrBlock: '0.0.0.0/0'
+
+  NetworkAclEntryInPrivateAllowAll:
+    Type: 'AWS::EC2::NetworkAclEntry'
+    Properties:
+      NetworkAclId: !Ref NetworkAclPrivate
+      RuleNumber: 99
+      Protocol: -1
+      RuleAction: allow
+      Egress: false
+      CidrBlock: '0.0.0.0/0'
+
+  NetworkAclEntryOutPrivateAllowAll:
+    Type: 'AWS::EC2::NetworkAclEntry'
+    Properties:
+      NetworkAclId: !Ref NetworkAclPrivate
+      RuleNumber: 99
+      Protocol: -1
+      RuleAction: allow
+      Egress: true
+      CidrBlock: '0.0.0.0/0'
+
+  SNSVPCEndpoint:
+    Type: AWS::EC2::VPCEndpoint
+    Properties: 
+      PrivateDnsEnabled: True
+      SecurityGroupIds: 
+        - '#{VpcEndpointSecurityGroup.GroupId}'
+      ServiceName: 'com.amazonaws.${self:provider.region}.sns'
+      SubnetIds:
+        - '#{PrivateASubnet}'
+        - '#{PrivateBSubnet}'
+      VpcEndpointType: Interface
+      VpcId: '#{VPC}'
+  
+  AthenaVPCEndpoint:
+    Type: AWS::EC2::VPCEndpoint
+    Properties: 
+      PrivateDnsEnabled: True
+      SecurityGroupIds: 
+        - '#{VpcEndpointSecurityGroup.GroupId}'
+      ServiceName: 'com.amazonaws.${self:provider.region}.athena'
+      SubnetIds:
+        - '#{PrivateASubnet}'
+        - '#{PrivateBSubnet}'
+      VpcEndpointType: Interface
+      VpcId: '#{VPC}'
+  
+  # See https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-resource-ec2-vpcendpoint.html
+  S3VPCEndpoint:
+    Type: AWS::EC2::VPCEndpoint
+    Properties:
+      ServiceName: 'com.amazonaws.${self:provider.region}.s3'
+      RouteTableIds:
+        - '#{PrivateARouteTable}'
+        - '#{PrivateBRouteTable}'
+      VpcEndpointType: Gateway
+      VpcId: '#{VPC}'
+
+  DynamoDBVPCEndpoint:
+    Type: AWS::EC2::VPCEndpoint
+    Properties: 
+      ServiceName: 'com.amazonaws.${self:provider.region}.dynamodb'
+      RouteTableIds:
+        - '#{PrivateARouteTable}'
+        - '#{PrivateBRouteTable}'
+      VpcEndpointType: Gateway
+      VpcId: '#{VPC}'
+  
+  VpcEndpointSecurityGroup:
+    Type: 'AWS::EC2::SecurityGroup'
+    Properties:
+      VpcId: '#{VPC}'
+      GroupDescription: 'Security group for VPC Endpoints'
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 443
+          ToPort: 443
+          SourceSecurityGroupId: '#{VpcEndpointLambdaSecurityGroup.GroupId}'
+  
+  VpcEndpointLambdaSecurityGroup:
+    Type: 'AWS::EC2::SecurityGroup'
+    Properties:
+      VpcId: '#{VPC}'
+      GroupDescription: 'Security group for VPC Endpoint Lambda'
+  

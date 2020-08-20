@@ -1,0 +1,21 @@
+Resources:
+  SubnetGroup:
+    Type: AWS::ElastiCache::SubnetGroup
+    Properties:
+      Description: Cache Subnet Group
+      SubnetIds:
+        - '#{PrivateASubnet}'
+        - '#{PrivateBSubnet}'
+
+  ElastiCacheCluster:
+    Type: AWS::ElastiCache::CacheCluster
+    Properties:
+      AutoMinorVersionUpgrade: true
+      Engine: redis
+      EngineVersion: '5.0.6'
+      CacheNodeType: ${self:custom.elasticache.nodeType}
+      ClusterName: elasticache-${self:service.name}-${self:provider.stage}
+      NumCacheNodes: 1
+      CacheSubnetGroupName: '#{SubnetGroup}'
+      VpcSecurityGroupIds:
+        - '#{CacheSecurityGroup.GroupId}'

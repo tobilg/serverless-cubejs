@@ -1,0 +1,22 @@
+{
+  "name": "serverless-cubejs",
+  "version": "0.1.0",
+  "scripts": {
+    "dev": "./node_modules/.bin/cubejs-dev-server",
+    "cfn-lint": "cfn-lint .serverless/cloudformation-template-update-stack.json",
+    "cfn-dia": "cfn-dia generate -t .serverless/cloudformation-template-update-stack.json -o docs/stack.drawio"
+  },
+  "dependencies": {
+    "@cubejs-backend/athena-driver": "^0.19.61",
+    "@cubejs-backend/mysql-driver": "^0.19.61",
+    "@cubejs-backend/server": "^0.19.61",
+    "@cubejs-backend/serverless": "^0.19.61",
+    "@cubejs-backend/serverless-aws": "^0.19.61",
+    "aws-sdk": "^2.737.0"
+  },
+  "devDependencies": {
+    "serverless-express": "^2.0.11",
+    "serverless-iam-roles-per-function": "^2.0.2",
+    "serverless-pseudo-parameters": "^2.5.0"
+  }
+}

@@ -1,0 +1,41 @@
+Resources:
+  CacheSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupName: ${self:service.name}-elasticache-securitygroup-${self:provider.stage}
+      GroupDescription: The VPC SecurityGroup for the Elasticache cluster
+      VpcId: '#{VPC}'
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 6379
+          ToPort: 6379
+          CidrIp: 10.0.0.0/20
+
+  LambdaSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupName: ${self:service.name}-lambda-securitygroup-${self:provider.stage}
+      GroupDescription: The VPC SecurityGroup for the Cube.js Lambda functions
+      VpcId: '#{VPC}'
+
+  AuroraClusterSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupName: ${self:service.name}-aurora-securitygroup-${self:provider.stage}
+      GroupDescription: The VPC SecurityGroup for the ${self:custom.aurora.cluster.name} Aurora Cluster
+      SecurityGroupEgress:
+        - Description: Egress for the ${self:custom.aurora.cluster.name} Aurora Cluster
+          CidrIp: 0.0.0.0/0
+          IpProtocol: '-1'
+      SecurityGroupIngress:
+        - Description: TCP ingress for the ${self:custom.aurora.cluster.name} Aurora Cluster
+          CidrIp: 10.0.0.0/22
+          FromPort: 3306
+          ToPort: 3306
+          IpProtocol: tcp
+        - Description: ICMP ingress for the ${self:custom.aurora.cluster.name} Aurora Cluster
+          CidrIp: 10.0.0.0/22
+          FromPort: -1
+          ToPort: -1
+          IpProtocol: icmp
+      VpcId: '#{VPC}'

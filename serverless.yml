@@ -1,0 +1,168 @@
+service: cubejs-service
+
+plugins:
+  - serverless-pseudo-parameters
+  - serverless-iam-roles-per-function
+  - serverless-express
+
+custom:
+
+  # SNS
+  sns: 
+    topicName: ${self:service.name}-process-${self:provider.stage}
+
+  # S3 buckets
+  s3:
+    buckets:
+      athenaQueryResults: ${self:service.name}-athena-query-results-${self:provider.stage}
+
+  # ElastiCache
+  elasticache:
+    nodeType: 'cache.t2.micro'
+
+  # Aurora
+  aurora:
+    # Cluster configuration
+    cluster:
+      # Name of the Aurora Serverless cluster
+      name: aurora-cluster-cubejs-${self:provider.stage}
+      # Shall the cluster be protected from deletion
+      deletionProtection: false
+    # Database configuration
+    database:
+      # Name of the database instance
+      name: cubejs
+    # Master User configuration
+    masterUser:
+      # Master user name
+      name: master
+      # Password (max. 41 characters)
+      password: '${opt:aurora-password}'
+    # Scaling configuration
+    scaling:
+      # Pausing configuration
+      pause:
+        # Shall the cluster be paused
+        autoPause: true
+        # After how many idle seconds (without active connection)
+        secondsUntilAutoPause: 600
+      # Capacity
+      capacity:
+        # Minimal instances
+        min: 1
+        # Maximal instances
+        max: 1
+    # Backup configuration
+    backup:
+      # Backup retention
+      retentionInDays: 30
+
+provider:
+  name: aws
+  runtime: nodejs12.x
+  stage: ${opt:stage, 'dev'}
+  region: ${opt:region, 'us-east-1'}
+  logRetentionInDays: 14
+  httpApi:
+    # Breaking change with Serverless 1.75.0
+    # See https://github.com/serverless/serverless/releases/tag/v1.75.0
+    payload: '1.0' 
+  logs:
+    httpApi: true
+      # See https://docs.aws.amazon.com/apigateway/latest/developerguide/http-api-logging-variables.html
+      # Can change to custom format like:
+      # format: '{ "ip": "$context.identity.sourceIp", "requestTime":"$context.requestTime" }'
+  vpc:
+    securityGroupIds:
+      # Account-level security group for being able to send SNS messages and Athena access
+      - '#{VpcEndpointSecurityGroup.GroupId}'
+      # Lambda security group
+      - '#{LambdaSecurityGroup.GroupId}'
+    subnetIds:
+      - '#{PrivateASubnet}'
+      - '#{PrivateBSubnet}'
+  iamRoleStatements:
+    - Effect: Allow       
+      Action:
+        - sns:*
+      Resource: arn:aws:sns:#{AWS::Region}:#{AWS::AccountId}:${self:custom.sns.topicName}
+    - Effect: Allow
+      Action:
+        # TODO: Improve
+        - athena:*
+      Resource: '*'
+    - Effect: Allow
+      Action:
+        - s3:ListBucket
+        - s3:GetBucketLocation
+      Resource: 'arn:aws:s3:::${self:custom.s3.buckets.athenaQueryResults}'
+    - Effect: Allow
+      Action:
+        - s3:GetBucketLocation
+        - s3:GetObject
+        - s3:ListBucket
+        - s3:ListBucketMultipartUploads
+        - s3:ListMultipartUploadParts
+        - s3:AbortMultipartUpload
+        - s3:PutObject
+      Resource: 'arn:aws:s3:::${self:custom.s3.buckets.athenaQueryResults}/*'
+    - Effect: Allow
+      Action:
+        - s3:GetObject
+      Resource: 'arn:aws:s3:::${opt:s3-data-bucket}/*'
+    - Effect: Allow
+      Action:
+        - s3:ListBucket
+        - s3:GetBucketLocation
+      Resource: 'arn:aws:s3:::${opt:s3-data-bucket}'
+    - Effect: Allow
+      Action:
+        # TODO: Improve
+        - glue:*
+      Resource: '*'
+    - Effect: Allow
+      Action:
+        - ec2:CreateNetworkInterface
+        - ec2:DescribeNetworkInterfaces
+        - ec2:DeleteNetworkInterface
+      Resource: '*'
+  environment:
+    AWS_NODEJS_CONNECTION_REUSE_ENABLED: '1' # Enable HTTP keep-alive connections for the AWS SDK
+    AWS_ACCOUNT_ID: '#{AWS::AccountId}'
+    CUBEJS_AWS_S3_OUTPUT_LOCATION: 's3://#{AthenaQueryResultsBucket}/'
+    CUBEJS_JDBC_DRIVER: athena
+    CUBEJS_DB_TYPE: athena
+    CUBEJS_API_SECRET: '${opt:cube-secret}'
+    CUBEJS_APP: '${self:service.name}-${self:provider.stage}'
+    CUBEJS_LOG_LEVEL: trace
+    CUBEJS_EXT_DB_HOST: '#{AuroraCluster.Endpoint.Address}'
+    CUBEJS_EXT_DB_PORT: '#{AuroraCluster.Endpoint.Port}'
+    CUBEJS_EXT_DB_NAME: '${self:custom.aurora.database.name}'
+    CUBEJS_EXT_DB_USER: '${self:custom.aurora.masterUser.name}'
+    CUBEJS_EXT_DB_PASS: '${self:custom.aurora.masterUser.password}'
+    REDIS_URL: 'redis://#{ElastiCacheCluster.RedisEndpoint.Address}:6379'
+    NODE_ENV: production
+    STAGE: '${self:provider.stage}'
+
+functions:
+  cubejs:
+    handler: serverlessCube.api
+    memorySize: 256
+    timeout: 27 # Maximum is 29 on a API Gateway HTTP API
+    events:
+      - httpApi: '*'
+  cubejsProcess:
+    handler: serverlessCube.process
+    memorySize: 256
+    timeout: 630
+    events:
+      - sns: '${self:custom.sns.topicName}'
+
+resources:
+
+  - ${file(resources/elasticache.yml)}
+  - ${file(resources/aurora-cluster.yml)}
+  - ${file(resources/security-groups.yml)}
+  - ${file(resources/ssm-parameters.yml)}
+  - ${file(resources/s3.yml)}
+  - ${file(resources/vpc.yml)}

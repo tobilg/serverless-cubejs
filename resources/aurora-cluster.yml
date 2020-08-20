@@ -1,0 +1,88 @@
+# See https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-resource-rds-dbcluster.html
+Resources:
+  AuroraCluster:
+    Type: AWS::RDS::DBCluster
+    Properties:
+      Engine: aurora
+      EngineMode: serverless
+      EngineVersion: '5.6.10a'
+      DBClusterIdentifier: ${self:custom.aurora.cluster.name}
+      DBSubnetGroupName:
+        Ref: AuroraClusterSubnetGroup
+      DatabaseName: ${self:custom.aurora.database.name}
+      MasterUsername: ${self:custom.aurora.masterUser.name}
+      MasterUserPassword: ${self:custom.aurora.masterUser.password}
+      BackupRetentionPeriod: ${self:custom.aurora.backup.retentionInDays}
+      DeletionProtection: ${self:custom.aurora.cluster.deletionProtection}
+      StorageEncrypted: true
+      KmsKeyId:
+        Fn::GetAtt: [AuroraClusterKMSKey, Arn]
+      AvailabilityZones:
+        - 'Fn::Select':  [0, 'Fn::GetAZs': '']
+        - 'Fn::Select':  [1, 'Fn::GetAZs': '']
+      VpcSecurityGroupIds:
+        - Ref: AuroraClusterSecurityGroup
+      ScalingConfiguration:
+        AutoPause: ${self:custom.aurora.scaling.pause.autoPause}
+        SecondsUntilAutoPause: ${self:custom.aurora.scaling.pause.secondsUntilAutoPause}
+        MinCapacity: ${self:custom.aurora.scaling.capacity.min}
+        MaxCapacity: ${self:custom.aurora.scaling.capacity.max}
+
+  AuroraClusterSubnetGroup:
+    Type: AWS::RDS::DBSubnetGroup
+    Properties:
+      DBSubnetGroupName: ${self:custom.aurora.cluster.name}-subnet-group
+      DBSubnetGroupDescription: RDS Subnet Group for the ${self:custom.aurora.cluster.name} Aurora Cluster instance
+      SubnetIds:
+        - '#{PrivateASubnet}'
+        - '#{PrivateBSubnet}'
+
+  AuroraClusterKMSKey:
+    Type: AWS::KMS::Key
+    Properties:
+      Description: KMS Key for the ${self:custom.aurora.cluster.name} Aurora Cluster instance
+      EnableKeyRotation: false
+      Enabled: true
+      KeyPolicy:
+        Version: '2012-10-17'
+        Statement:
+          - Sid: Administration
+            Action:
+              - kms:*
+            Effect: Allow
+            Principal:
+              AWS:
+                - Fn::Join:
+                    - ''
+                    - - 'arn:aws:iam::'
+                      - Ref: AWS::AccountId
+                      - :root
+            Resource: '*'
+          - Sid: Principals
+            Effect: Allow
+            Action:
+              - kms:Encrypt
+              - kms:Decrypt
+              - kms:ReEncrypt*
+              - kms:GenerateDataKey*
+              - kms:DescribeKey
+            Resource: '*'
+            Principal:
+              AWS: '*'
+            Condition:
+              StringEquals:
+                kms:CallerAccount:
+                  Ref: AWS::AccountId
+                kms:ViaService:
+                  Fn::Join:
+                    - ''
+                    - - ssm.
+                      - Ref: AWS::Region
+                      - .amazonaws.com
+
+  AuroraClusterKMSKeyAlias:
+    Type: AWS::KMS::Alias
+    Properties:
+      AliasName: alias/aurora-cluster-kms-key
+      TargetKeyId:
+        Ref: AuroraClusterKMSKey

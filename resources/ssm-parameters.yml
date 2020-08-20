@@ -1,0 +1,31 @@
+# See https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-resource-ssm-parameter.html
+Resources:
+  AuroraClusterUsername:
+    Type: AWS::SSM::Parameter
+    Properties:
+      Name: /${self:provider.stage}/service/aurora/username
+      Description: The master username of the Aurora Cluster instance
+      Type: String
+      Value: ${self:custom.aurora.masterUser.name}
+  AuroraClusterPassword:
+    Type: AWS::SSM::Parameter
+    Properties:
+      Name: /${self:provider.stage}/service/aurora/password
+      Description: The password of the Aurora Cluster instance
+      Type: String
+      Value: ${self:custom.aurora.masterUser.password}
+  AuroraClusterDatabaseName:
+    Type: AWS::SSM::Parameter
+    Properties:
+      Name: /${self:provider.stage}/service/aurora/databasename
+      Description: The database name of the Aurora Cluster instance
+      Type: String
+      Value: ${self:custom.aurora.database.name}
+  AuroraClusterEndpointUrl:
+    Type: AWS::SSM::Parameter
+    Properties:
+      Name: /${self:provider.stage}/service/aurora/endpoint
+      Description: The endpoint of the Aurora Cluster instance
+      Type: String
+      Value:
+        Fn::GetAtt: [AuroraCluster, 'Endpoint.Address']
