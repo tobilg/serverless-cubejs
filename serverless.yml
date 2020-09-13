@@ -9,7 +9,7 @@ custom:
 
   # SNS
   sns: 
-    topicName: ${self:service.name}-${self:provider.stage}-process
+    topicName: ${self:service.name}-process-${self:provider.stage}
 
   # S3 buckets
   s3:
