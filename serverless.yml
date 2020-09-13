@@ -9,7 +9,7 @@ custom:
 
   # SNS
   sns: 
-    topicName: ${self:service.name}-process-${self:provider.stage}
+    topicName: ${self:service.name}-${self:provider.stage}-process
 
   # S3 buckets
   s3:
@@ -75,7 +75,7 @@ provider:
   vpc:
     securityGroupIds:
       # Account-level security group for being able to send SNS messages and Athena access
-      - '#{VpcEndpointSecurityGroup.GroupId}'
+      - '#{VpcEndpointLambdaSecurityGroup.GroupId}'
       # Lambda security group
       - '#{LambdaSecurityGroup.GroupId}'
     subnetIds:

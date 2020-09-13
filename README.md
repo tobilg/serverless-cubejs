@@ -8,7 +8,7 @@ This project uses
 * API Gateway HTTP APIs for hosting the Cube.js backend API
 * Athena for querying data in S3
 * Aurora Serverless for pre-aggregations
-* Elasticache for query result caching
+* ElastiCache for query result caching
 
 All of that runs in a preconfigured VPC. You can also have a look at the stack diagram in [docs/stack.drawio](docs/stack.drawio). 
 
