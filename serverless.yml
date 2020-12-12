@@ -8,8 +8,8 @@ plugins:
 custom:
 
   # SNS
-  sns: 
-    topicName: ${self:service.name}-process-${self:provider.stage}
+  sns:
+    topicName: ${self:service.name}-${self:provider.stage}-process
 
   # S3 buckets
   s3:
